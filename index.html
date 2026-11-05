@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ELECTRONUMERIQ - Aviator 2D</title>
+    <style>
+        :root {
+            --primary: #00d2ff;
+            --secondary: #3a7bd5;
+            --dark: #0f172a;
+            --card-bg: #1e293b;
+            --accent: #10b981;
+            --danger: #ef4444;
+            --text: #f8fafc;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            user-select: none;
+        }
+        body {
+            background: linear-gradient(135deg, var(--dark), #090d16);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            padding: 10px;
+        }
+        .container {
+            width: 100%;
+            max-width: 480px;
+            background: rgba(30, 41, 59, 0.9);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 10px;
+            width: 100%;
+        }
+        .app-logo {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--primary);
+            box-shadow: 0 0 12px rgba(0, 210, 255, 0.4);
+            margin-bottom: 5px;
+        }
+        h1 {
+            font-size: 1.4rem;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 2px;
+            letter-spacing: 0.5px;
+        }
+        .subtitle {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-bottom: 5px;
+        }
+        canvas {
+            background: linear-gradient(to bottom, #1e293b, #0f172a);
+            border-radius: 16px;
+            border: 2px solid rgba(0, 210, 255, 0.3);
+            width: 100%;
+            max-width: 440px;
+            height: 320px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+            display: block;
+        }
+        .controls-panel {
+            display: flex;
+            width: 100%;
+            max-width: 440px;
+            gap: 10px;
+            margin-top: 12px;
+        }
+        .ctrl-btn {
+            flex: 1;
+            background: linear-gradient(135deg, var(--card-bg), #0f172a);
+            border: 2px solid rgba(0, 210, 255, 0.3);
+            color: var(--primary);
+            font-size: 1.5rem;
+            font-weight: bold;
+            padding: 14px 0;
+            border-radius: 14px;
+            cursor: pointer;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: all 0.1s;
+        }
+        .ctrl-btn:active {
+            transform: scale(0.95);
+            background: var(--primary);
+            color: white;
+        }
+        .btn-start {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 14px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            max-width: 440px;
+            margin-top: 10px;
+            box-shadow: 0 4px 15px rgba(0, 210, 255, 0.4);
+        }
+        .hud-overlay {
+            position: absolute;
+            top: 110px;
+            left: 25px;
+            right: 25px;
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 0.95rem;
+            color: var(--primary);
+            pointer-events: none;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+        footer {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <img src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=150&auto=format&fit=crop&q=80" alt="ELECTRONUMERIQ Logo" class="app-logo">
+        <h1>ELECTRONUMERIQ</h1>
+        <p class="subtitle">🛩️ Pilote d'Élite - Vol vers la Gauche</p>
+    </header>
+
+    <div class="hud-overlay">
+        <span id="score-text">Score : 0</span>
+        <span id="high-score-text">Record : 0</span>
+    </div>
+
+    <canvas id="gameCanvas" width="440" height="320"></canvas>
+
+    <div class="controls-panel">
+        <div class="ctrl-btn" id="btn-up">▲ HAUT</div>
+        <div class="ctrl-btn" id="btn-down">▼ BAS</div>
+    </div>
+
+    <button class="btn-start" id="btn-main" onclick="handleMainButtonClick()">DÉMARRER LE VOL</button>
+
+    <footer>ELECTRONUMERIQ Mobile - Vol 2D Interactif</footer>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Audio Web synthétisé
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function initAudio() {
+        if (!audioCtx) audioCtx = new AudioCtx();
+    }
+
+    function playSound(type) {
+        initAudio();
+        if (!audioCtx) return;
+
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        const now = audioCtx.currentTime;
+
+        if (type === 'point') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(587.33, now); // D5
+            osc.frequency.exponentialRampToValueAtTime(880, now + 0.1); // A5
+            gain.gain.setValueAtTime(0.15, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+            osc.start(now);
+            osc.stop(now + 0.15);
+        } else if (type === 'crash') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(140, now);
+            osc.frequency.exponentialRampToValueAtTime(40, now + 0.35);
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+            osc.start(now);
+            osc.stop(now + 0.4);
+        }
+    }
+
+    // État du jeu
+    let gameState = 'START'; // 'START', 'PLAYING', 'GAMEOVER'
+    let score = 0;
+    let highScore = 0;
+    let frameCount = 0;
+
+    // Avion orienté vers la gauche
+    const plane = {
+        x: 340, // Positionné du côté droit, volant VERS LA GAUCHE
+        y: 160,
+        width: 38,
+        height: 22,
+        speedY: 0,
+        accelY: 0.35,
+        maxSpeed: 4.5
+    };
+
+    let obstacles = [];
+    let clouds = [];
+
+    // Initialisation des nuages de fond
+    for (let i = 0; i < 5; i++) {
+        clouds.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * (canvas.height - 60),
+            speed: 0.5 + Math.random() * 0.8,
+            radius: 18 + Math.random() * 15
+        });
+    }
+
+    // Gestion des entrées
+    let moveUp = false;
+    let moveDown = false;
+
+    document.getElementById('btn-up').addEventListener('touchstart', (e) => { e.preventDefault(); moveUp = true; });
+    document.getElementById('btn-up').addEventListener('touchend', (e) => { e.preventDefault(); moveUp = false; });
+    document.getElementById('btn-up').addEventListener('mousedown', () => { moveUp = true; });
+    document.getElementById('btn-up').addEventListener('mouseup', () => { moveUp = false; });
+
+    document.getElementById('btn-down').addEventListener('touchstart', (e) => { e.preventDefault(); moveDown = true; });
+    document.getElementById('btn-down').addEventListener('touchend', (e) => { e.preventDefault(); moveDown = false; });
+    document.getElementById('btn-down').addEventListener('mousedown', () => { moveDown = true; });
+    document.getElementById('btn-down').addEventListener('mouseup', () => { moveDown = false; });
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowUp' || e.key === 'z' || e.key === 'Z') moveUp = true;
+        if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') moveDown = true;
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (e.key === 'ArrowUp' || e.key === 'z' || e.key === 'Z') moveUp = false;
+        if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') moveDown = false;
+    });
+
+    function handleMainButtonClick() {
+        if (gameState === 'START' || gameState === 'GAMEOVER') {
+            resetGame();
+            gameState = 'PLAYING';
+            document.getElementById('btn-main').innerText = 'VOL EN COURS... (HAUT / BAS)';
+        }
+    }
+
+    function resetGame() {
+        plane.y = 160;
+        plane.speedY = 0;
+        obstacles = [];
+        score = 0;
+        frameCount = 0;
+        document.getElementById('score-text').innerText = `Score : ${score}`;
+    }
+
+    function spawnObstacle() {
+        const gap = 110;
+        const minHeight = 40;
+        const maxHeight = canvas.height - gap - minHeight;
+        const topHeight = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+
+        // Obstacles générés à gauche et défilant vers la droite pour que l'avion (à droite) volant vers la gauche les affronte !
+        obstacles.push({
+            x: -40, // Apparaît du côté gauche
+            topHeight: topHeight,
+            bottomY: topHeight + gap,
+            width: 34,
+            passed: false
+        });
+    }
+
+    function update() {
+        if (gameState !== 'PLAYING') return;
+
+        frameCount++;
+
+        // Physique de l'avion (Haut / Bas)
+        if (moveUp) {
+            plane.speedY -= plane.accelY;
+        } else if (moveDown) {
+            plane.speedY += plane.accelY;
+        } else {
+            // Stabilisation douce / légère gravité
+            plane.speedY *= 0.94;
+        }
+
+        // Limiter la vitesse verticale
+        if (plane.speedY > plane.maxSpeed) plane.speedY = plane.maxSpeed;
+        if (plane.speedY < -plane.maxSpeed) plane.speedY = -plane.maxSpeed;
+
+        plane.y += plane.speedY;
+
+        // Limites d'écran (Plafond / Sol)
+        if (plane.y < 10) {
+            plane.y = 10;
+            plane.speedY = 0;
+        }
+        if (plane.y + plane.height > canvas.height - 10) {
+            triggerGameOver();
+            return;
+        }
+
+        // Animation des nuages (défilent vers la droite pour accentuer le vol vers la gauche)
+        clouds.forEach(cloud => {
+            cloud.x += cloud.speed;
+            if (cloud.x - cloud.radius > canvas.width) {
+                cloud.x = -cloud.radius * 2;
+                cloud.y = Math.random() * (canvas.height - 60);
+            }
+        });
+
+        // Génération d'obstacles
+        if (frameCount % 90 === 0) {
+            spawnObstacle();
+        }
+
+        // Déplacement des obstacles vers la droite (l'avion volant vers la gauche)
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+            let obs = obstacles[i];
+            obs.x += 3; // Déplacement vers la droite
+
+            // Vérification de passage (Score)
+            if (!obs.passed && obs.x > plane.x + plane.width) {
+                obs.passed = true;
+                score += 10;
+                playSound('point');
+                document.getElementById('score-text').innerText = `Score : ${score}`;
+                if (score > highScore) {
+                    highScore = score;
+                    document.getElementById('high-score-text').innerText = `Record : ${highScore}`;
+                }
+            }
+
+            // Test de collision (AABB)
+            if (
+                plane.x < obs.x + obs.width &&
+                plane.x + plane.width > obs.x &&
+                (plane.y < obs.topHeight || plane.y + plane.height > obs.bottomY)
+            ) {
+                triggerGameOver();
+                return;
+            }
+
+            // Supprimer obstacles sortis par la droite
+            if (obs.x > canvas.width + 50) {
+                obstacles.splice(i, 1);
+            }
+        }
+    }
+
+    function triggerGameOver() {
+        playSound('crash');
+        gameState = 'GAMEOVER';
+        document.getElementById('btn-main').innerText = 'RECOMMENCER LE VOL';
+    }
+
+    function drawPlane(x, y, w, h) {
+        ctx.save();
+        ctx.translate(x + w / 2, y + h / 2);
+
+        // Inclinaison du nez de l'avion selon la trajectoire verticale
+        let angle = plane.speedY * 0.06;
+        // Comme il pointe vers la gauche, voler vers le haut monte le nez vers la gauche
+        ctx.rotate(-angle);
+
+        // Fuselage (Rouge/Jaune sportif, pointant vers la GAUCHE)
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        // Nez à gauche
+        ctx.moveTo(-w/2, 0);
+        ctx.lineTo(w/2, -h/2 + 2);
+        ctx.lineTo(w/2, h/2 - 2);
+        ctx.closePath();
+        ctx.fill();
+
+        // Cockpit (Vitrage bleu translucide)
+        ctx.fillStyle = '#00d2ff';
+        ctx.beginPath();
+        ctx.arc(-w/6, -2, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Aile principale
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(-w/8, -h/2 - 4, 10, h + 8);
+
+        // Queue (Gouverne de direction à droite)
+        ctx.fillStyle = '#dc2626';
+        ctx.beginPath();
+        ctx.moveTo(w/2 - 4, -h/2 + 2);
+        ctx.lineTo(w/2 + 6, -h/2 - 6);
+        ctx.lineTo(w/2 + 6, -h/2 + 4);
+        ctx.closePath();
+        ctx.fill();
+
+        // Hélice à l'avant (à gauche)
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-w/2 - 2, -10);
+        ctx.lineTo(-w/2 - 2, 10);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    function render() {
+        // Effacer le canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Dessiner les nuages
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        clouds.forEach(cloud => {
+            ctx.beginPath();
+            ctx.arc(cloud.x, cloud.y, cloud.radius, 0, Math.PI * 2);
+            ctx.arc(cloud.x + 12, cloud.y - 8, cloud.radius * 0.7, 0, Math.PI * 2);
+            ctx.arc(cloud.x + 24, cloud.y, cloud.radius * 0.8, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // Dessiner les obstacles (Tours / Pylônes électriques)
+        obstacles.forEach(obs => {
+            // Tour supérieure
+            let gradTop = ctx.createLinearGradient(obs.x, 0, obs.x + obs.width, 0);
+            gradTop.addColorStop(0, '#3b82f6');
+            gradTop.addColorStop(1, '#1d4ed8');
+
+            ctx.fillStyle = gradTop;
+            ctx.fillRect(obs.x, 0, obs.width, obs.topHeight);
+            ctx.fillStyle = '#93c5fd';
+            ctx.fillRect(obs.x - 3, obs.topHeight - 8, obs.width + 6, 8);
+
+            // Tour inférieure
+            let gradBot = ctx.createLinearGradient(obs.x, 0, obs.x + obs.width, 0);
+            gradBot.addColorStop(0, '#3b82f6');
+            gradBot.addColorStop(1, '#1d4ed8');
+
+            ctx.fillStyle = gradBot;
+            ctx.fillRect(obs.x, obs.bottomY, obs.width, canvas.height - obs.bottomY);
+            ctx.fillStyle = '#93c5fd';
+            ctx.fillRect(obs.x - 3, obs.bottomY, obs.width + 6, 8);
+        });
+
+        // Dessiner l'avion
+        drawPlane(plane.x, plane.y, plane.width, plane.height);
+
+        // Écrans de veille / Fin
+        if (gameState === 'START') {
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#00d2ff';
+            ctx.font = 'bold 20px "Segoe UI", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('ELECTRONUMERIQ AVIATOR', canvas.width / 2, 130);
+
+            ctx.fillStyle = '#cbd5e1';
+            ctx.font = '14px "Segoe UI", sans-serif';
+            ctx.fillText('Pilotez vers la GAUCHE et évitez les obstacles !', canvas.width / 2, 165);
+            ctx.fillText('Utilisez les boutons HAUT / BAS ou les flèches du clavier.', canvas.width / 2, 190);
+        } else if (gameState === 'GAMEOVER') {
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#ef4444';
+            ctx.font = 'bold 24px "Segoe UI", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('CRASH ! CRASH !', canvas.width / 2, 130);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '16px "Segoe UI", sans-serif';
+            ctx.fillText(`Score obtenu : ${score}`, canvas.width / 2, 170);
+            ctx.fillText(`Meilleur score : ${highScore}`, canvas.width / 2, 195);
+        }
+    }
+
+    function gameLoop() {
+        update();
+        render();
+        requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
+</script>
+</body>
+</html>
